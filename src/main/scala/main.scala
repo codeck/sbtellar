@@ -6,7 +6,7 @@ object AccountFamily {
   import org.bouncycastle.math.ec.{ECPoint, ECCurve}
   import org.bouncycastle.util.encoders.Hex
   import org.bouncycastle.asn1.sec.SECNamedCurves
-  import org.bouncycastle.crypto.digests.{SHA256Digest, SHA512Digest}
+  import org.bouncycastle.crypto.digests.{SHA256Digest, SHA512Digest, RIPEMD160Digest}
   val ecparams = SECNamedCurves.getByName("secp256k1")
   val paramN = ecparams.getN()
 
@@ -46,7 +46,7 @@ object AccountFamily {
 	val checksum = result256.take(4)
 	val bytes = (version +: payload) ++ checksum
 	if (version == 0) {
-	  Base58en(new BigInteger(bytes.toArray)).reverse.padTo(27, ripple58Dict(0)).reverse
+	  Base58en(new BigInteger(bytes.toArray)).reverse.padTo(26, ripple58Dict(0)).reverse
 	}
 	else Base58en(new BigInteger(bytes.toArray))
   }
@@ -54,7 +54,7 @@ object AccountFamily {
   def TestVectors() {
 	{
 	  val acctZero = "rrrrrrrrrrrrrrrrrrrrrhoLvTp"
-	  assert(HumanEncode(padBN(BigInteger.valueOf(0), 20), 0) == acctZero)
+	  assert('r'+:HumanEncode(padBN(BigInteger.valueOf(0), 20), 0) == acctZero)
 	}
 	{
 	  val rightret = new BigInteger(Hex.decode("B8244D028981D693AF7B456AF8EFA4CAD63D282E19FF14942C246E50D9351D22"))
@@ -82,13 +82,14 @@ object AccountFamily {
 	  assert(root.toString('a') == pubKey)
 
 	  val acct = "rhcfR9Cg98qCxHpCcPBmMonbDBXo84wyTn"
-	  //assert(root.toString('r') == acct)
+	  assert(root.toString('r') == acct)
 	}
   }
 
   def test() {
-	TestVectors()
+	//TestVectors()
 	//println(() map(c => "%02x".format(c)) mkString(" ")))
+	
   }
 
   case class RootKey(seed:BigInteger, initseq:Int = -1, initsubseq:Int = -1) {
@@ -111,7 +112,18 @@ object AccountFamily {
 		// case 'p' => //validation_private_key
 		//   "32"
 		case 'r' => //account_id 
-		  "0"
+		  {
+			val hash256 = new Array[Byte](32)
+			val hash160 = new Array[Byte](20)
+			val input = pubKey
+			val sha = new SHA256Digest
+			val rmd = new RIPEMD160Digest
+			sha.update(input, 0, input.length)
+			sha.doFinal(hash256, 0)
+			rmd.update(hash256, 0, hash256.length)
+			rmd.doFinal(hash160, 0)
+			'r' +: HumanEncode(hash160, 0)
+		  }
 		case 'a' => //account_public_key 
 		  HumanEncode(pubKey, 35)
 		case 'p' => //account_private_key
