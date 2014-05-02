@@ -6,45 +6,48 @@ object AccountFamily {
   import org.bouncycastle.math.ec.{ECPoint, ECCurve}
   import org.bouncycastle.util.encoders.Hex
   import org.bouncycastle.asn1.sec.SECNamedCurves
-  import org.bouncycastle.crypto.digests.SHA512Digest
-  //import org.bouncycastle.math.ec.ECAlgorithms
-  //import org.bouncycastle.crypto.params.ECKeyParameters;
-  //import org.bouncycastle.jce.ECKeyUtil;
-  //import org.bouncycastle.jce.spec.ECNamedCurveSpec
-
+  import org.bouncycastle.crypto.digests.{SHA256Digest, SHA512Digest}
   val ecparams = SECNamedCurves.getByName("secp256k1")
   val paramN = ecparams.getN()
 
+  val ripple58Dict = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
 
-  private[this] def SHA512Half(input:Array[Byte]) = {
+  private[this] def SHA512Half(input :Array[Byte]) = {
 	val dgst = new SHA512Digest
 	val result512 = new Array[Byte](64)
 	dgst.update(input, 0, input.length)
 	dgst.doFinal(result512, 0)
 	new BigInteger(result512.take(32))
   }
-  private[this] def ECpriv2pub(priv:BigInteger) = {
-	val pub = ecparams.getG().multiply(priv)
-	val cpub = new ECPoint.Fp(ecparams.getCurve, pub.getX, pub.getY, true)
-	cpub.getEncoded
+
+  private[this] def padBN(bn :BigInteger, len :Int) = {
+	bn.toByteArray().toList.reverse.padTo(len, 0:Byte).reverse.take(len)
   }
-  private[this] def padBN(bn: BigInteger, len:Int) = {
-	bn.toByteArray().toList.reverse.padTo(len, 0:Byte).reverse
-  }
-  private[this] def padCons(first: Seq[Byte], conseq: Int) = {
+
+  private[this] def padCons(first :Seq[Byte], conseq :Int) = {
 	first ++ BigInteger.valueOf(conseq).toByteArray.toList.reverse.padTo(4, 0:Byte).reverse
   }
+
   private[this] def Base58en(bn: BigInteger) = {
-	val syms = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
-	val base = BigInteger.valueOf(syms.length)
+	val base = BigInteger.valueOf(ripple58Dict.length)
 	var nbn = bn
-	do {
-	  nbn = nbn.divide(base)
-	  val s = syms.charAt(nbn.mod(base).intValue)
-	  print(s)
-	}while (nbn.compareTo(ZERO) > 0)
-	println()
+	val iter = Iterator.iterate(bn)(_.divide(base)).takeWhile(_.compareTo(ZERO) > 0).map(x => ripple58Dict.charAt(x.mod(base).intValue))	
+	iter.toList.reverse.mkString
   }
+
+  private[this] def HumanEncode(payload :Seq[Byte], version :Byte) = {
+	val dgst = new SHA256Digest
+	val result256 = new Array[Byte](32)
+	(version +: payload).foreach(dgst.update)
+	dgst.doFinal(result256, 0)
+	dgst.reset
+	dgst.update(result256, 0, result256.length)
+	dgst.doFinal(result256, 0)
+	val checksum = result256.take(4)
+	val bytes = (version +: payload) ++ checksum
+	Base58en(new BigInteger(bytes.toArray))
+  }
+
   def TestVectors() {
 	{
 	  val rightret = new BigInteger(Hex.decode("B8244D028981D693AF7B456AF8EFA4CAD63D282E19FF14942C246E50D9351D22"))
@@ -56,34 +59,102 @@ object AccountFamily {
 	  assert(SHA512Half(arr).compareTo(rightret) == 0)
 	}
 	{
-	  val rightret = new BigInteger(Hex.decode("7CFBA64F771E93E817E15039215430B53F7401C34931D111EAB3510B22DBB0D8"))
 	  val seed = new BigInteger(Hex.decode("71ED064155FFADFA38782C5E0158CB26"))
-	  assert(GenerateRootDeterministicKey(seed).compareTo(rightret) == 0)
+	  val root = RootKey(seed)
+
+	  val humanSeed = "shHM53KPZ87Gwdqarm1bAmPeXg8Tn"
+	  assert(root.toString('s') == humanSeed)
+
+	  val privGen = new BigInteger(Hex.decode("7CFBA64F771E93E817E15039215430B53F7401C34931D111EAB3510B22DBB0D8"))
+	  assert(root.privGen.compareTo(privGen) == 0)
+
+	  val pubGen = "fht5yrLWh3P8DrJgQuVNDPQVXGTMyPpgRHFKGQzFQ66o3ssesk3o"
+	  assert(root.toString('f') == pubGen)
+
+	  val pubKey = "aBRoQibi2jpDofohooFuzZi9nEzKw9Zdfc4ExVNmuXHaJpSPh8uJ"
+	  assert(root.toString('a') == pubKey)
+
+	  val acct = "rhcfR9Cg98qCxHpCcPBmMonbDBXo84wyTn"
+	  assert(root.toString('r') == acct)
 	}
   }
+
   def test() {
 	TestVectors()
 	//println(() map(c => "%02x".format(c)) mkString(" ")))
   }
-  def GenerateRootDeterministicKey(seed: BigInteger) = {
-	val dgst = new SHA512Digest
-	val result512 = new Array[Byte](64)
-	var seq = 0
-	var priv256 = seed
-	do {
-	  val input160 = padCons(padBN(seed, 16), seq).toArray
-	  priv256 = SHA512Half(input160)
-	  seq = seq + 1
-	}
-	while (priv256.equals(ZERO)  || (priv256.compareTo(paramN) >= 0))
 
-	Base58en(new BigInteger(ECpriv2pub(priv256)))
-	
-	priv256
+  case class RootKey(seed:BigInteger, initseq:Int = -1, initsubseq:Int = -1) {
+	private[this] val dgst = new SHA512Digest
+	private[this] val result512 = new Array[Byte](64)
+	private[this] var seq = initseq
+	def seqNum = seq
+	private[this] var subseq = initsubseq
+	def subSeqNum = subseq
+
+	private[this] def compressPoint(pt:ECPoint) = {
+	  val cpub = new ECPoint.Fp(ecparams.getCurve, pt.getX, pt.getY, true)
+	  cpub.getEncoded
+	}
+
+	def toString(version:Char):String = {
+	  version match {
+		case 'n' => //validation_public_key 
+		  "28"
+		// case 'p' => //validation_private_key
+		//   "32"
+		case 'r' => //account_id 
+		  "0"
+		case 'a' => //account_public_key 
+		  HumanEncode(pubKey, 35)
+		case 'p' => //account_private_key
+		  HumanEncode(padBN(privKey, 32), 34)
+		case 'f' => //family_public_generator
+		  HumanEncode(pubGen, 41)	
+		case 's' => //family_seed | validation_seed
+		  HumanEncode(padBN(seed, 16), 33)
+		case _ =>
+		  "??"
+	  }
+	}
+
+	lazy val pubGenPoint = ecparams.getG().multiply(privGen)
+	lazy val pubGen = compressPoint(pubGenPoint)
+	lazy val privGen = {
+	  var priv256 = seed
+	  do {
+		seq = seq + 1
+		val input160 = padCons(padBN(seed, 16), seq).toArray
+		priv256 = SHA512Half(input160)
+	  }
+	  while (priv256.equals(ZERO)  || (priv256.compareTo(paramN) >= 0))
+	  priv256
+	}
+
+	lazy val pubKeyPoint = pubGenPoint.add(ecparams.getG().multiply(privHash))
+	lazy val pubKey = compressPoint(pubKeyPoint)
+	lazy val privHash = {
+	  var priv256 = seed
+	  do {
+	   subseq = subseq + 1
+		val input = padCons(padCons(pubGen, seq), subseq).toArray
+		priv256 = SHA512Half(input)
+	  }
+	  while (priv256.equals(ZERO)  || (priv256.compareTo(paramN) >= 0))
+	  priv256	  
+	}
+	lazy val privKey = privGen.add(privHash).mod(paramN)
   }
-  def GeneratePublicDeterministicKey() {
+
+  def GenerateRootDeterministicKey(seed: BigInteger) = {
+	val root = RootKey(seed)
+	root.privGen
+  }
+  def GeneratePublicDeterministicKey(subseq:Int) {
+	
   }
   def GeneratePrivateDeterministicKey() {
+	
   }
 }
 
