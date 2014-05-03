@@ -17,9 +17,11 @@ object AccountFamily {
 	val result512 = new Array[Byte](64)
 	dgst.update(input, 0, input.length)
 	dgst.doFinal(result512, 0)
-	new BigInteger(result512.take(32))
+	unsignedBN(result512.take(32))
   }
 
+  def unsignedBN(input: Array[Byte]) = new BigInteger(1, input)
+	
   private[this] def padBN(bn :BigInteger, len :Int) = {
 	bn.toByteArray().toList.reverse.padTo(len, 0:Byte).reverse.take(len)
   }
@@ -46,9 +48,9 @@ object AccountFamily {
 	val checksum = result256.take(4)
 	val bytes = (version +: payload) ++ checksum
 	if (version == 0) {
-	  Base58en(new BigInteger(bytes.toArray)).reverse.padTo(26, ripple58Dict(0)).reverse
+	  Base58en(unsignedBN(bytes toArray)).reverse.padTo(26, ripple58Dict(0)).reverse
 	}
-	else Base58en(new BigInteger(bytes.toArray))
+	else Base58en(unsignedBN(bytes toArray))
   }
 
   def TestVectors() {
@@ -57,22 +59,22 @@ object AccountFamily {
 	  assert('r'+:HumanEncode(padBN(BigInteger.valueOf(0), 20), 0) == acctZero)
 	}
 	{
-	  val rightret = new BigInteger(Hex.decode("B8244D028981D693AF7B456AF8EFA4CAD63D282E19FF14942C246E50D9351D22"))
+	  val rightret = unsignedBN(Hex.decode("B8244D028981D693AF7B456AF8EFA4CAD63D282E19FF14942C246E50D9351D22"))
 	  assert(SHA512Half(Array[Byte](0)).compareTo(rightret) == 0)
 	}
 	{
-	  val rightret = new BigInteger(Hex.decode("8EEE2EA9E7F93AB0D9E66EE4CE696D6824922167784EC7F340B3567377B1CE64"))
+	  val rightret = unsignedBN(Hex.decode("8EEE2EA9E7F93AB0D9E66EE4CE696D6824922167784EC7F340B3567377B1CE64"))
 	  val arr:Array[Byte] = padCons(Seq.empty, 100000).toArray
 	  assert(SHA512Half(arr).compareTo(rightret) == 0)
 	}
 	{
-	  val seed = new BigInteger(Hex.decode("71ED064155FFADFA38782C5E0158CB26"))
+	  val seed = unsignedBN(Hex.decode("71ED064155FFADFA38782C5E0158CB26"))
 	  val root = RootKey(seed)
 
 	  val humanSeed = "shHM53KPZ87Gwdqarm1bAmPeXg8Tn"
 	  assert(root.toString('s') == humanSeed)
 
-	  val privGen = new BigInteger(Hex.decode("7CFBA64F771E93E817E15039215430B53F7401C34931D111EAB3510B22DBB0D8"))
+	  val privGen = unsignedBN(Hex.decode("7CFBA64F771E93E817E15039215430B53F7401C34931D111EAB3510B22DBB0D8"))
 	  assert(root.privGen.compareTo(privGen) == 0)
 
 	  val pubGen = "fht5yrLWh3P8DrJgQuVNDPQVXGTMyPpgRHFKGQzFQ66o3ssesk3o"
@@ -87,9 +89,20 @@ object AccountFamily {
   }
 
   def test() {
-	//TestVectors()
+	TestVectors()
 	//println(() map(c => "%02x".format(c)) mkString(" ")))
-	
+	var seed = unsignedBN(Hex.decode("71ED064155FFADFA38782C5E0158CB26"))
+	var round = 5000
+	while (round > 0
+		 ) {
+	  val root = new RootKey(seed)
+	  println(root.toString('r'), root.toString('s'))
+	  println(root.seqNum, root.subSeqNum)
+	  //root.pubKey
+	  //root.toString('r')
+	  round = round-1
+	  seed = seed.add(ONE)
+	}
   }
 
   case class RootKey(seed:BigInteger, initseq:Int = -1, initsubseq:Int = -1) {
@@ -107,8 +120,8 @@ object AccountFamily {
 
 	def toString(version:Char):String = {
 	  version match {
-		case 'n' => //validation_public_key 
-		  "28"
+		// case 'n' => //validation_public_key 
+		//   "28"
 		// case 'p' => //validation_private_key
 		//   "32"
 		case 'r' => //account_id 
