@@ -24,7 +24,7 @@ object AccountFamily {
   def unsignedBN(input: Array[Byte]) = new BigInteger(1, input)
 	
   private[this] def padBN(bn :BigInteger, len :Int) = {
-	bn.toByteArray().toList.reverse.padTo(len, 0:Byte).reverse.take(len)
+	bn.toByteArray().toList.reverse.take(len).padTo(len, 0:Byte).reverse
   }
 
   private[this] def padCons(first :Seq[Byte], conseq :Int) = {
