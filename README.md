@@ -1,7 +1,8 @@
-sbtripple
+sbtellar
 =========
+a stellard fork on jvm
 
-[ripple](http://ripple.com/) utilities
+[stellar](http://stellar.org/) utilities
 
 functions to be included:
 
@@ -12,4 +13,3 @@ functions to be included:
 * Ledger querying
 * ...
 
-[Donate 50 XRP](https://ripple.com//send?to=rareZSKE9ZcyA8ZXAYiJjUD1V1xBZu4LiY&amount=50) to [rareZSKE9ZcyA8ZXAYiJjUD1V1xBZu4LiY](https://ripple.com/graph/#rareZSKE9ZcyA8ZXAYiJjUD1V1xBZu4LiY)

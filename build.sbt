@@ -1,4 +1,4 @@
-name := "sbt-ripple"
+name := "sbtellar"
 
 version := "1.0"
 
