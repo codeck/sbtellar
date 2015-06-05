@@ -1,4 +1,5 @@
 *~
 .ensime*
+project/target/*
 project/project/*
 target/*
