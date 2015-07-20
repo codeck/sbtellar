@@ -39,7 +39,7 @@ object MainApp extends App {
 
   implicit val sys = akka.actor.ActorSystem();
   import sys.dispatcher
-  implicit val mat = akka.stream.ActorFlowMaterializer()
+  implicit val mat = akka.stream.ActorMaterializer
 
   val conn = StreamTcp().outgoingConnection("127.0.0.1", 4433)
   //val conn = StreamTcp().outgoingConnection("validator-03.stellar.org", 52001)

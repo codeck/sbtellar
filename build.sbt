@@ -12,13 +12,13 @@ libraryDependencies += "com.google.protobuf" % "protobuf-java" % "2.5.0"
 
 libraryDependencies += "org.bouncycastle" % "bcprov-jdk15on" % "1.51"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.11"
+libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.12"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC3"
+libraryDependencies += "com.typesafe.akka" %% "akka-stream-experimental" % "1.0"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0-RC3"
+libraryDependencies += "com.typesafe.akka" %% "akka-http-core-experimental" % "1.0"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-http-experimental" % "1.0-RC3"
+libraryDependencies += "com.typesafe.akka" %% "akka-http-experimental" % "1.0"
 
 libraryDependencies += "com.typesafe.slick" %% "slick" % "3.0.0"
 
