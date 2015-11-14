@@ -6,20 +6,45 @@ a sbt plugin to participate stellar-core network (eventually, a scala fork of st
 ```
 Concept mapping:
 user => stellar account
+group => federation name
 host => stellar-core peer
 file => trustline/contract/... advancedt ransactions
 ```
-Supported Commands:
 
-* newkey
+Deployment should be specific before each run.
+Deployment consists of Network(XLM, KLM), Stage(Single/Standalone, Test, Live) and Role(Watcher, Validator).
+
+after Deployment determined, run level should specified by `init`
+
+- 0: stop
+- 1: restart (use current db)
+- 2: reset to minimal (no full history)
+- 3: reinit (initdb)
+- 4: full reset (create new dir)
+
+### Supported Commands:
+
+##### \>newkey
 
 Generate new random address
 
-* id
+##### \>who
 
-List all the address and correspoding secure key in su history
+List all the address and corresponding secure key in su history
+
+---
+
+# TODO
+
+* clear
+
+Clear screen
 
 * whoami
+
+Show current active address
+
+* id
 
 Show current address and info
 
@@ -85,5 +110,6 @@ list...
 
 edit...
 
-TODO: /w|who/touch/top/ps/whois/host/..?
-TODO: init, server, believe, info, tx, send, dumpxdr, help
+TBD: touch/top/ps/whois/host..?
+TBD: gpasswd/newgrp/sg... for federation?
+TBD: init, server, believe, info, tx, send, dumpxdr, help

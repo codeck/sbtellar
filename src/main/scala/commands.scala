@@ -10,67 +10,110 @@ object StellarCommands extends AutoPlugin {
   override lazy val projectSettings = Seq(commands += Command.command("solarEscape")(solarEscapeCmdProc))
   override def trigger = allRequirements
 
-  val currSecurekey = SettingKey[String]("stellar-securekey", "the secret key of current account")
+  object Keys {
+    val currNetwork = SettingKey[String]("network", "current network (XLM KLM)")
+    val currRole = SettingKey[String]("role", "current role (Watcher Validator)")
+    val currRunLevel = SettingKey[Int]("runlevel", "current run level")
+    val currKeychain = SettingKey[List[StrSeed]]("stellar-securekey", "the secret keys")
+    //val democmd = inputKey[String]("Demo")
+  }
 
-  val demo = inputKey[String]("Demo")
+  class DynamicState(s :State) {
+    //State contains mutable variables
+    //Extracted contains Immutable variables from project definitions(in *.sbt or project/*.scala files)
+    val states = collection.mutable.ListBuffer(s)
+
+    def getByKey[T](k :SettingKey[T]): Option[T] = {
+      states.head.get(k.key)
+    }
+    def setByKey[T](k :SettingKey[T], v :T): Unit = {
+      states.prepend(states.head.put(k.key, v))
+    }
+    def updateByKey[T](k :SettingKey[T])(p :Option[T] => T) = {
+      states.prepend(states.head.update(k.key)(p))
+    }
+
+    def state(reinit :Boolean =false) = if (reinit) {
+      val extracted: Extracted = Project.extract(s)
+      extracted.append(Seq(
+        shellPrompt := ((st: State) => {
+          st.get(Keys.currKeychain.key).flatMap(_.headOption).map(_.address.toString.take(6) ++ "..").getOrElse("_") + ">"
+        })
+      ), states.head).copy(
+        definedCommands =
+          supportedCommands.toNative ++
+            Seq(BasicCommands.shell, BasicCommands.exit), //++BuiltinCommands.ConsoleCommands
+        remainingCommands =
+          "init" +: s.remainingCommands :+ "shell"
+      )
+    }
+    else {
+      states.head
+    }
+  }
 
   val helpMessage =
-    """
+    s"""
       |                                                             ---]===>
-      |                       Welcome the Stellar Network!
+      |                       Welcome back to the Stellar Network!
       |Available command:
-      |  newkey, id, exit
+      |${supportedCommands.procs.map(cmd => cmd._1).mkString(", ")}
       |
     """.stripMargin
 
   def solarEscapeCmdProc(state: State): State = {
     println(helpMessage)
+    val ds = new DynamicState(state)
+    ds.state(true)
+  }
 
-    val extracted: Extracted = Project.extract(state)
-    extracted.append(
-      shellPrompt := (st => {
-        Project.extract(st).getOpt(currSecurekey).flatMap(StrSeed.parse(_).toOption).map(_.address.toString).getOrElse("_") + ">"
-      }), state).copy(
-      definedCommands =
-        supportedCommands ++
-        Seq(BasicCommands.shell, BasicCommands.exit), //++BuiltinCommands.ConsoleCommands
-      remainingCommands =
-        "init" +: state.remainingCommands :+ "shell"
-    )
+  type CmdProc = (DynamicState) => Boolean
+  def wrapProc(cmdproc: CmdProc) :(State) => State = {
+    def cmd(state :State): State = {
+      val ds = new DynamicState(state)
+      cmdproc(ds)
+      ds.state(false)
+    }
+    cmd
   }
 
   import complete.DefaultParsers._
   val digit = charClass(_.isDigit, "digit").examples("0", "1", "2")
 
-  lazy val supportedCommands = Seq(
-    Command.command("newkey")(genkeyCmdProc),
-    Command.command("id")(showkeyCmdProc),
-    Command.command("init")(initCmdProc),
-    Command("test")(x => digit)(testCmdProc)
+  class CommandDefs(val procs :(String, CmdProc)*)(natives :Command*) {
+    def toNative = {
+      procs.map(x =>  Command.command(x._1)(wrapProc(x._2))) ++
+        natives.toSeq
+    }
+  }
+
+  lazy val supportedCommands = new CommandDefs(
+    ("init", initCmd),
+    ("newkey", genkeyCmd),
+    ("who", listkeyCmd)
+  )(
+    Command("test")(s => digit)(testCmdProc)
   )
 
-  def genkeyCmdProc(state: State): State = {
+  def genkeyCmd = { s :DynamicState =>
     val randkey = StrKey.random()
     println("Address:" + randkey.address)
     println("Seed:" + randkey)
-
-    val extracted: Extracted = Project.extract(state)
-
-    extracted.append(Seq(shellPrompt := (st => {
-      Project.extract(st).getOpt(currSecurekey).flatMap(StrSeed.parse(_).toOption).map(_.address.toString.take(6)).getOrElse("") + "...>"
-      }),currSecurekey := randkey.toString), state)
+    s.updateByKey(Keys.currKeychain)(randkey +: _.toList.flatMap(identity))
+    true
   }
 
-  def initCmdProc(state: State): State = {
-
-    println("inited")
-    state
+  def initCmd = { s :DynamicState =>
+    true
   }
 
-  def showkeyCmdProc(state: State): State = {
-    val extracted: Extracted = Project.extract(state)
-    println(extracted.getOpt(currSecurekey).getOrElse("secure key not generated"))
-    state
+
+  def listkeyCmd = { s :DynamicState =>
+    s.getByKey(Keys.currKeychain).toList.flatMap(identity).zipWithIndex.foreach{ x =>
+      val (key, ord) = x
+      println("[%d] %s :%s".format(ord, key.address.toString(), key.toString().toLowerCase()))
+    }
+    true
   }
 
   def testCmdProc(state: State, args:Char): State = {
