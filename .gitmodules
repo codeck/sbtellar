@@ -1,3 +1,0 @@
-[submodule "deps/scala-stellar-base"]
-	path = deps/scala-stellar-base
-	url = https://github.com/strllar/scala-stellar-base.git
