@@ -42,9 +42,9 @@ object StellarCommands extends AutoPlugin {
       ), states.head).copy(
         definedCommands =
           supportedCommands.toNative ++
-            Seq(BasicCommands.shell, BasicCommands.exit), //++BuiltinCommands.ConsoleCommands
+            Seq(BuiltinCommands.shell, BasicCommands.exit), //++BuiltinCommands.ConsoleCommands
         remainingCommands =
-          "init" +: s.remainingCommands :+ "shell"
+             (Exec("init", None) +: s.remainingCommands :+ Exec("shell", None))
       )
     }
     else {
@@ -96,7 +96,7 @@ object StellarCommands extends AutoPlugin {
   )
 
   def genkeyCmd = { s :DynamicState =>
-    val randkey = StrKey.random()
+    val randkey = StrKey.random()(Networks.XLMLive)
     println("Address:" + randkey.address)
     println("Seed:" + randkey)
     s.updateByKey(Keys.currKeychain)(randkey +: _.toList.flatMap(identity))
@@ -120,18 +120,18 @@ object StellarCommands extends AutoPlugin {
     args.toString.toInt match {
       case 1 => {
         println("Start")
-        StellarCore.startInstance()
+        //StellarCore.startInstance()
       }
       case 2 => {
         println("Stop")
-        StellarCore.stopInstace()
+        //StellarCore.stopInstace()
       }
       case 3 => {
         println("start http only")
         HttpServer.startServer("dist/")
       }
       case 4 => {
-        import StellarCore._
+        //import StellarCore._
       }
     }
     state

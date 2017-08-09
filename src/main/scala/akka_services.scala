@@ -2,16 +2,15 @@ import java.io.{FileOutputStream, File}
 import java.net.SocketOptions
 
 import akka.actor.ActorSystem
-import akka.http.ServerSettings
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{Uri, HttpRequest}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RequestContext
-import akka.http.scaladsl.server.directives.FormFieldDirectives
+import akka.http.scaladsl.settings.ServerSettings
 import akka.io.Inet
 import akka.stream.ActorMaterializer
-import akka.stream.io.OutputStreamSink
+import akka.stream.scaladsl.StreamConverters
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.Future
@@ -29,7 +28,7 @@ object HttpServer {
 
   def startServer(distroot :String) {
     val route =
-      path("hist" / RestPath) { pathRest =>
+      path("hist" / RemainingPath) { pathRest =>
         get {
           getFromFile(new File(distroot + "history/" + pathRest))
         } ~
@@ -38,7 +37,7 @@ object HttpServer {
               val file = new File(distroot + "history/" + pathRest)
               file.getParentFile().mkdirs();
               file.createNewFile();
-              val mat = rc.request.entity.dataBytes.runWith(OutputStreamSink(() => {
+              val mat = rc.request.entity.dataBytes.runWith(StreamConverters.fromOutputStream(() => {
                 new FileOutputStream(file)
               }))
               mat.flatMap(filesize => {
@@ -51,10 +50,10 @@ object HttpServer {
       } ~
         path("tx") {
           //support `curl -F blob="BASE64+/ENCODED+/TRANSACTION" http://localhost:8080/tx` without manual urlencoding
-          formFields(FormFieldDirectives.symbol2NR('blob)) {
+          formFields('blob) {
             (blob) =>  {
               (rc: RequestContext) => {
-                Http().singleRequest(HttpRequest(uri = Uri("http://localhost:11626/tx").withQuery(("blob", blob)))).
+                Http().singleRequest(HttpRequest(uri = Uri("http://localhost:11626/tx").withQuery(("blob", blob) +: Uri.Query.Empty))).
                   flatMap { (resp) =>
                   rc.complete(resp)
                 }(rc.executionContext)
@@ -63,7 +62,7 @@ object HttpServer {
           }
         }
     maybeBindingFuture = Some(Http().bindAndHandle(route, "localhost", 8080,
-      ServerSettings(system).copy(socketOptions = scala.collection.immutable.Seq(Inet.SO.ReuseAddress(true)))))
+      settings = ServerSettings(system).withSocketOptions(scala.collection.immutable.Seq(Inet.SO.ReuseAddress(true)))))
   }
   def stopServer() {
     import system.dispatcher

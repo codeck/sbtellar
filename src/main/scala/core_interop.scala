@@ -9,6 +9,7 @@ import java.util.{TimeZone, Calendar}
 
 import akka.util.{ByteString, ByteStringBuilder}
 import org.strllar.stellarbase._
+/*
 import org.strllar.stellarbase.compiled_xdr.Operation.OperationBody
 import org.strllar.stellarbase.compiled_xdr.Transaction.TransactionExt
 import org.strllar.stellarbase.compiled_xdr._
@@ -165,3 +166,4 @@ object StellarCore {
     }
   }
 }
+*/
