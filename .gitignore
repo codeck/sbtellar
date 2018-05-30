@@ -1,6 +1,5 @@
 *~
 .ensime*
-project/target/*
-project/project/*
-target/*
+**/target/*
+**project/project/*
 .idea/*
